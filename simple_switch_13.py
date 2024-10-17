@@ -137,19 +137,27 @@ class SimpleSwitch13(app_manager.RyuApp):
                                   in_port=in_port, actions=actions, data=data)
         datapath.send_msg(out)
     @set_ev_cls(event.EventSwitchEnter)
-    def get_topology(self,ev):
+    def get_topology(self, ev):
         time.sleep(1)
-        switches=get_switch(self, None)
-        links=get_link(self, None)
+        switches = get_switch(self, None)
+        links = get_link(self, None)
+        
         self.logger.info("Switches: %s", switches)
         self.logger.info("Links: %s", links)
-        
+
+        # Iterate over each link and only add unique connections
         for link in links:
-            src=link.src.dpid
-            dst=link.dst.dpid
-            self.topology.setdefault(src, []).append(dst)
-            self.topology.setdefault(dst, []).append(src)
+            src = link.src.dpid
+            dst = link.dst.dpid
+
+            # Ensure that the link isn't already present before adding
+            if dst not in self.topology.get(src, []):
+                self.topology.setdefault(src, []).append(dst)
+            if src not in self.topology.get(dst, []):
+                self.topology.setdefault(dst, []).append(src)
+
         self.logger.info("Topology: %s", self.topology)
+
     
     def DFS(self,graph, src, dst, path=None):
         if path is None:
