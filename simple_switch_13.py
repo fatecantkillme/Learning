@@ -139,7 +139,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 
     @set_ev_cls(event.EventSwitchEnter)
     def get_topology(self,ev):
-        time.sleep(2)
+        time.sleep(1)
         switches=get_switch(self, None)
         links=get_link(self, None)
         self.logger.info("Switches: %s", switches)
@@ -151,7 +151,6 @@ class SimpleSwitch13(app_manager.RyuApp):
             self.topology.setdefault(src, []).append(dst)
             self.topology.setdefault(dst, []).append(src)
         self.logger.info("Topology: %s", self.topology)
-        print(self.topology)
     
     def DFS(self,graph, src, dst, path=None):
         if path is None:
