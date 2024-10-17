@@ -136,39 +136,3 @@ class SimpleSwitch13(app_manager.RyuApp):
         out = parser.OFPPacketOut(datapath=datapath, buffer_id=msg.buffer_id,
                                   in_port=in_port, actions=actions, data=data)
         datapath.send_msg(out)
-
-    @set_ev_cls(event.EventSwitchEnter)
-    def get_topology(self,ev):
-        time.sleep(1)
-        switches=get_switch(self, None)
-        links=get_link(self, None)
-        self.logger.info("Switches: %s", switches)
-        self.logger.info("Links: %s", links)
-        
-        for link in links:
-            src=link.src.dpid
-            dst=link.dst.dpid
-            self.topology.setdefault(src, []).append(dst)
-            self.topology.setdefault(dst, []).append(src)
-        self.logger.info("Topology: %s", self.topology)
-    
-    def DFS(self,graph, src, dst, path=None):
-        if path is None:
-            path = []
-        
-        # 检查图中是否存在 src 和 dst 节点
-        if src not in graph or dst not in graph:
-            return []
-        
-        path = path + [src]
-        if src == dst:
-            return [path]  # 返回包含路径的列表
-        
-        paths = []
-        for node in graph.get(src, []):
-            if node not in path:
-                new_paths = self.DFS(graph, node, dst, path)
-                for new_path in new_paths:
-                    paths.append(new_path)  # 将整个路径作为一个整体添加
-        
-        return paths
