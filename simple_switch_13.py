@@ -118,7 +118,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 
     @set_ev_cls(event.EventSwitchEnter)
     def get_topology(self, ev):
-        time.sleep(1)
+        time.sleep(3)  # 增加等待时间，确保链路信息已经准备好
 
         switches = get_switch(self, None)
         switch_list = [switch.dp.id for switch in switches]
@@ -126,6 +126,11 @@ class SimpleSwitch13(app_manager.RyuApp):
 
         self.logger.info("Switches: %s", switch_list)
         self.logger.info("Links: %s", links)
+
+        if not links:
+            self.logger.warning("No links found. Is the topology setup correctly?")
+        else:
+            self.logger.info("Links successfully retrieved")
 
         for link in links:
             src = link.src.dpid
@@ -139,10 +144,13 @@ class SimpleSwitch13(app_manager.RyuApp):
         self.logger.info("Topology: %s", self.topology)
 
         hosts = get_all_host(self)
-        for host in hosts:
-            if host.ipv4:
-                self.hosts[host.ipv4[0]] = host.port.dpid
-                self.logger.info("Host: %s, DPID: %s", host.ipv4[0], host.port.dpid)
+        if not hosts:
+            self.logger.warning("No hosts found. Is host discovery enabled?")
+        else:
+            for host in hosts:
+                if host.ipv4:
+                    self.hosts[host.ipv4[0]] = host.port.dpid
+                    self.logger.info("Host: %s, DPID: %s", host.ipv4[0], host.port.dpid)
 
     def DFS(self, graph, src, dst, path=None):
         if path is None:
