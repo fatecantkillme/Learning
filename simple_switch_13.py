@@ -139,7 +139,7 @@ class SimpleSwitch13(app_manager.RyuApp):
                                 in_port=in_port, actions=actions, data=data)
         datapath.send_msg(out)
 
-        
+
     def install_path(self, path, src_ip, dst_ip, datapath):
         parser = datapath.ofproto_parser
         for i in range(len(path) - 1):
@@ -151,32 +151,38 @@ class SimpleSwitch13(app_manager.RyuApp):
             self.add_flow(datapath, 1, match, actions)
 
 
-    @set_ev_cls(event.EventSwitchEnter)
+        @set_ev_cls(event.EventSwitchEnter)
     def get_topology(self, ev):
         time.sleep(1)
+        
+        # 获取交换机和链路信息
         switches = get_switch(self, None)
         switch_list = [switch.dp.id for switch in switches]
         links = get_link(self, None)
         
-        # 获取所有主机
-        hosts = get_all_host(self)
-        for host in hosts:
-            self.hosts[host.ipv4[0]] = host.port.dpid  # 关联主机的IP与其连接的交换机DPID
-        
-        self.logger.info("Hosts: %s", self.hosts)
+        # 打印交换机和链路信息
         self.logger.info("Switches: %s", switch_list)
         self.logger.info("Links: %s", links)
-
-        # 更新拓扑结构
+        
+        # 遍历链路并建立拓扑
         for link in links:
             src = link.src.dpid
             dst = link.dst.dpid
+            
             if dst not in self.topology.get(src, []):
                 self.topology.setdefault(src, []).append(dst)
             if src not in self.topology.get(dst, []):
                 self.topology.setdefault(dst, []).append(src)
-
+        
         self.logger.info("Topology: %s", self.topology)
+        
+        # 获取主机信息并建立 IP 与 DPID 的关联
+        hosts = get_all_host(self, None)
+        for host in hosts:
+            if host.ipv4:  # 检查主机是否有 IPv4 地址
+                self.hosts[host.ipv4[0]] = host.port.dpid  # 关联主机的IP与其连接的交换机DPID
+                self.logger.info("Host: %s, DPID: %s", host.ipv4[0], host.port.dpid)
+
 
 
     
