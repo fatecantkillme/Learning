@@ -5,7 +5,7 @@ from ryu.controller.handler import set_ev_cls
 from ryu.ofproto import ofproto_v1_3
 from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet
-from ryu.lib.packet import ether_types
+from ryu.lib.packet import ether_types,lldp
 from ryu.topology import switches, event
 from ryu.topology.api import get_switch, get_link, get_all_host
 import time
