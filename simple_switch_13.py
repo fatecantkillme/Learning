@@ -151,7 +151,7 @@ class SimpleSwitch13(app_manager.RyuApp):
             self.add_flow(datapath, 1, match, actions)
 
 
-        @set_ev_cls(event.EventSwitchEnter)
+    @set_ev_cls(event.EventSwitchEnter)
     def get_topology(self, ev):
         time.sleep(1)
         
