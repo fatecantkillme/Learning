@@ -33,6 +33,8 @@ class SimpleSwitch13(app_manager.RyuApp):
         super(SimpleSwitch13, self).__init__(*args, **kwargs)
         self.mac_to_port = {}
         self.topology={}
+        self.all_paths=[]
+        self.hosts={}
         
     
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
@@ -94,17 +96,29 @@ class SimpleSwitch13(app_manager.RyuApp):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
         in_port = msg.match['in_port']
+        dpid = datapath.id
 
         pkt = packet.Packet(msg.data)
         eth = pkt.get_protocols(ethernet.ethernet)[0]
         if eth.ethertype == ether_types.ETH_TYPE_LLDP:
             # ignore lldp packet
             return
+        
+        if eth.ethertype == 0x0800:  # IPv4
+            ip_pkt = pkt.get_protocol(ipv4.ipv4)
+            src_ip = ip_pkt.src
+            dst_ip = ip_pkt.dst
+            
+            self.logger.info("PacketIn: src IP: %s, dst IP: %s", src_ip, dst_ip)
+            self.logger.info("PacketIn from DPID: %s", dpid)
+        if src_ip not in self.hosts:
+                self.hosts[src_ip] = (dpid, msg.match['in_port'])
 
         dst = eth.dst
         src = eth.src
 
         dpid = format(datapath.id, "d").zfill(16)
+
         self.mac_to_port.setdefault(dpid, {})
 
         self.logger.info("packet in %s %s %s %s", dpid, src, dst, in_port)
