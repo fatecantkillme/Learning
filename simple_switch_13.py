@@ -22,7 +22,7 @@ from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet
 from ryu.lib.packet import ether_types
 from ryu.topology import switches,event
-from ryu.topology.api import get_switch, get_link
+from ryu.topology.api import get_switch, get_link,get_all_host
 import time
 
 
@@ -104,15 +104,7 @@ class SimpleSwitch13(app_manager.RyuApp):
             # ignore lldp packet
             return
         
-        if eth.ethertype == 0x0800:  # IPv4
-            ip_pkt = pkt.get_protocol(ipv4.ipv4)
-            src_ip = ip_pkt.src
-            dst_ip = ip_pkt.dst
-            
-            self.logger.info("PacketIn: src IP: %s, dst IP: %s", src_ip, dst_ip)
-            self.logger.info("PacketIn from DPID: %s", dpid)
-        if src_ip not in self.hosts:
-                self.hosts[src_ip] = (dpid, msg.match['in_port'])
+        
 
         dst = eth.dst
         src = eth.src
@@ -154,9 +146,10 @@ class SimpleSwitch13(app_manager.RyuApp):
     def get_topology(self, ev):
         time.sleep(1)
         switches = get_switch(self, None)
+        switch_list=[switch.dp.id for switch in switches]
         links = get_link(self, None)
         
-        self.logger.info("Switches: %s", switches)
+        self.logger.info("Switches: %s", switch_list)
         self.logger.info("Links: %s", links)
 
         # Iterate over each link and only add unique connections
