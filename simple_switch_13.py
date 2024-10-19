@@ -90,8 +90,10 @@ class SimpleSwitch13(app_manager.RyuApp):
                                             in_port=in_port, actions=actions, data=data)
                     datapath.send_msg(out)
                     return
+                else :
+                    print("no out_port")
 
-            # 如果目的 MAC 不在表中，使用 FLOOD 泛洪
+        # 如果目的 MAC 不在表中，使用 FLOOD 泛洪
             actions = [parser.OFPActionOutput(ofproto.OFPP_FLOOD)]
             data = msg.data if msg.buffer_id == ofproto.OFP_NO_BUFFER else None
             out = parser.OFPPacketOut(datapath=datapath, buffer_id=msg.buffer_id,
