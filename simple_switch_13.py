@@ -51,6 +51,11 @@ class SimpleSwitch13(app_manager.RyuApp):
 
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def _packet_in_handler(self, ev):
+        # If you hit this you might want to increase
+        # the "miss_send_length" of your switch
+        if ev.msg.msg_len < ev.msg.total_len:
+            self.logger.debug("packet truncated: only %s of %s bytes",
+                              ev.msg.msg_len, ev.msg.total_len)
         msg = ev.msg
         datapath = msg.datapath
         ofproto = datapath.ofproto
@@ -64,7 +69,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 
         src = eth.src
         dst = eth.dst
-        dpid = datapath.id
+        dpid = format(datapath.id, "d").zfill(16)
 
         # 获取源IP和目的IP
         ipv4_pkt = pkt.get_protocol(ipv4.ipv4)
@@ -94,6 +99,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 
         # 如果没有找到路径或者没有IP地址关联时，使用默认的FLOOD处理
         self.mac_to_port.setdefault(dpid, {})
+        self.logger.info("packet in %s %s %s %s", dpid, src, dst, in_port)
         self.mac_to_port[dpid][src] = in_port
         if dst in self.mac_to_port[dpid]:
             out_port = self.mac_to_port[dpid][dst]
