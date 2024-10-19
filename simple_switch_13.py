@@ -91,6 +91,8 @@ class SimpleSwitch13(app_manager.RyuApp):
                     # 使用最长路径下发流表规则
                     self.install_path(longest_path, src_ip, dst_ip)
                     return  # 下发后可以直接返回，避免重复处理
+        if not ipv4_pkt:
+            print("No IPv4 packet found")
 
         # 如果没有找到路径或者没有IP地址关联时，使用默认的FLOOD处理
         self.mac_to_port.setdefault(dpid, {})
