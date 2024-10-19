@@ -22,7 +22,7 @@ from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet
 from ryu.lib.packet import ether_types
 from ryu.topology import switches,event
-from ryu.topology.api import get_switch, get_link,get_all_host
+from ryu.topology.api import get_switch, get_link
 import time
 
 
@@ -33,8 +33,6 @@ class SimpleSwitch13(app_manager.RyuApp):
         super(SimpleSwitch13, self).__init__(*args, **kwargs)
         self.mac_to_port = {}
         self.topology={}
-        self.all_paths=[]
-        self.hosts={}
         
     
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
@@ -96,21 +94,17 @@ class SimpleSwitch13(app_manager.RyuApp):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
         in_port = msg.match['in_port']
-        dpid = datapath.id
 
         pkt = packet.Packet(msg.data)
         eth = pkt.get_protocols(ethernet.ethernet)[0]
         if eth.ethertype == ether_types.ETH_TYPE_LLDP:
             # ignore lldp packet
             return
-        
-        
 
         dst = eth.dst
         src = eth.src
 
         dpid = format(datapath.id, "d").zfill(16)
-
         self.mac_to_port.setdefault(dpid, {})
 
         self.logger.info("packet in %s %s %s %s", dpid, src, dst, in_port)
@@ -146,10 +140,9 @@ class SimpleSwitch13(app_manager.RyuApp):
     def get_topology(self, ev):
         time.sleep(1)
         switches = get_switch(self, None)
-        switch_list=[switch.dp.id for switch in switches]
         links = get_link(self, None)
         
-        self.logger.info("Switches: %s", switch_list)
+        self.logger.info("Switches: %s", switches)
         self.logger.info("Links: %s", links)
 
         # Iterate over each link and only add unique connections
