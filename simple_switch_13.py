@@ -61,6 +61,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 
         if eth.ethertype == ether_types.ETH_TYPE_LLDP:
             return
+        print(eth.ethertype)
 
         src = eth.src
         dst = eth.dst
