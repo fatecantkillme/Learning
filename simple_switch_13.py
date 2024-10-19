@@ -59,56 +59,45 @@ class SimpleSwitch13(app_manager.RyuApp):
         pkt = packet.Packet(msg.data)
         eth = pkt.get_protocols(ethernet.ethernet)[0]
 
-        if eth.ethertype == ether_types.ETH_TYPE_LLDP:
+        # 如果不是 ARP 数据包，直接忽略
+        if eth.ethertype != ether_types.ETH_TYPE_ARP:
+            self.logger.info("Non-ARP packet received, ethertype: %s", eth.ethertype)
             return
-        print(eth.ethertype)
 
-        src = eth.src
-        dst = eth.dst
-        dpid = datapath.id
+        # 处理 ARP 数据包
+        arp_pkt = pkt.get_protocol(arp.arp)
+        if arp_pkt:
+            src_mac = arp_pkt.src_mac
+            src_ip = arp_pkt.src_ip
+            dst_ip = arp_pkt.dst_ip
 
-        if eth.ethertype == ether_types.ETH_TYPE_IP:  # 只处理 IPv4 数据包
-            ipv4_pkt = pkt.get_protocol(ipv4.ipv4)
-            if ipv4_pkt:
-                src_ip = ipv4_pkt.src
-                dst_ip = ipv4_pkt.dst
+            self.logger.info("ARP packet received: src_mac=%s, src_ip=%s, dst_ip=%s", src_mac, src_ip, dst_ip)
 
-                src_dpid = self.hosts.get(src_ip)
-                dst_dpid = self.hosts.get(dst_ip)
+            # 更新 MAC 到端口的映射
+            dpid = datapath.id
+            self.mac_to_port.setdefault(dpid, {})
+            self.mac_to_port[dpid][src_mac] = in_port
 
-                if src_dpid and dst_dpid:
-                    # 使用DFS查找路径
-                    paths = self.DFS(self.topology, src_dpid, dst_dpid)
-                    if paths:
-                        # 打印所有路径
-                        self.logger.info("All Paths: %s", paths)
+            # 查找目标 IP 对应的 MAC 地址，如果知道目的 MAC 地址，转发包
+            if dst_ip in self.hosts:
+                dst_mac = self.hosts[dst_ip]
+                out_port = self.mac_to_port[dpid].get(dst_mac)
 
-                        # 找到最短路径和最长路径
-                        shortest_path = min(paths, key=len)
-                        longest_path = max(paths, key=len)
-                        self.logger.info("Shortest Path: %s", shortest_path)
-                        self.logger.info("Longest Path: %s", longest_path)
+                if out_port:
+                    actions = [parser.OFPActionOutput(out_port)]
+                    data = msg.data if msg.buffer_id == ofproto.OFP_NO_BUFFER else None
+                    out = parser.OFPPacketOut(datapath=datapath, buffer_id=msg.buffer_id,
+                                            in_port=in_port, actions=actions, data=data)
+                    datapath.send_msg(out)
+                    return
 
-                        # 使用最长路径下发流表规则
-                        self.install_path(longest_path, src_ip, dst_ip)
-                        return  # 下发后可以直接返回，避免重复处理
-        else:
-            self.logger.info("Non-IPv4 packet, ethertype: %s", eth.ethertype)
-            return  # 不处理非 IPv4 数据包
+            # 如果目的 MAC 不在表中，使用 FLOOD 泛洪
+            actions = [parser.OFPActionOutput(ofproto.OFPP_FLOOD)]
+            data = msg.data if msg.buffer_id == ofproto.OFP_NO_BUFFER else None
+            out = parser.OFPPacketOut(datapath=datapath, buffer_id=msg.buffer_id,
+                                    in_port=in_port, actions=actions, data=data)
+            datapath.send_msg(out)
 
-
-        # 如果没有找到路径或者没有IP地址关联时，使用默认的FLOOD处理
-        self.mac_to_port.setdefault(dpid, {})
-        self.mac_to_port[dpid][src] = in_port
-        if dst in self.mac_to_port[dpid]:
-            out_port = self.mac_to_port[dpid][dst]
-        else:
-            out_port = ofproto.OFPP_FLOOD
-        actions = [parser.OFPActionOutput(out_port)]
-        data = msg.data if msg.buffer_id == ofproto.OFP_NO_BUFFER else None
-        out = parser.OFPPacketOut(datapath=datapath, buffer_id=msg.buffer_id,
-                                  in_port=in_port, actions=actions, data=data)
-        datapath.send_msg(out)
 
     def install_path(self, path, src_ip, dst_ip):
         for i in range(len(path) - 1):
