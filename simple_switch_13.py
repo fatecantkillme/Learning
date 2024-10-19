@@ -82,7 +82,10 @@ class SimpleSwitch13(app_manager.RyuApp):
 
                 # 如果目标 MAC 存在，安装双向流表
                 if dst_ip in self.hosts:
-                    dst_mac = self.hosts[dst_ip]
+                    dst_dpid = self.hosts[dst_ip]
+                    dst_mac = None
+                    for mac, port in self.mac_to_port[dst_dpid].items():
+                        dst_mac = mac  # 获取目标 MAC 地址
                     out_port = self.mac_to_port[dpid].get(dst_mac)
 
                     if out_port:
@@ -103,23 +106,24 @@ class SimpleSwitch13(app_manager.RyuApp):
                         datapath.send_msg(out)
                         return
     def install_path(self, path, src_ip, dst_ip):
-    for i in range(len(path) - 1):
-        datapath = self.get_datapath(path[i])
-        next_dpid = path[i + 1]
-        out_port = self.get_port(path[i], next_dpid)
-        parser = datapath.ofproto_parser
+        for i in range(len(path) - 1):
+            datapath = self.get_datapath(path[i])
+            next_dpid = path[i + 1]
+            out_port = self.get_port(path[i], next_dpid)
+            parser = datapath.ofproto_parser
 
-        # 安装从 src_ip 到 dst_ip 的流表
-        match = parser.OFPMatch(eth_type=0x0800, ipv4_src=src_ip, ipv4_dst=dst_ip)
-        actions = [parser.OFPActionOutput(out_port)]
-        self.add_flow(datapath, 1, match, actions)
+            # 安装从 src_ip 到 dst_ip 的流表
+            match = parser.OFPMatch(eth_type=0x0800, ipv4_src=src_ip, ipv4_dst=dst_ip)
+            actions = [parser.OFPActionOutput(out_port)]
+            self.add_flow(datapath, 1, match, actions)
 
-        # 安装从 dst_ip 到 src_ip 的反向流表
-        reverse_match = parser.OFPMatch(eth_type=0x0800, ipv4_src=dst_ip, ipv4_dst=src_ip)
-        reverse_out_port = self.get_port(next_dpid, path[i])
-        reverse_datapath = self.get_datapath(next_dpid)
-        reverse_actions = [parser.OFPActionOutput(reverse_out_port)]
-        self.add_flow(reverse_datapath, 1, reverse_match, reverse_actions)
+            # 安装从 dst_ip 到 src_ip 的反向流表
+            reverse_match = parser.OFPMatch(eth_type=0x0800, ipv4_src=dst_ip, ipv4_dst=src_ip)
+            reverse_out_port = self.get_port(next_dpid, path[i])
+            reverse_datapath = self.get_datapath(next_dpid)
+            reverse_actions = [parser.OFPActionOutput(reverse_out_port)]
+            self.add_flow(reverse_datapath, 1, reverse_match, reverse_actions)
+
 
 
     @set_ev_cls(event.EventSwitchEnter)
@@ -160,21 +164,38 @@ class SimpleSwitch13(app_manager.RyuApp):
 
 
     def DFS(self, graph, src, dst, path=None):
-        if path is None:
-            path = []
+    if path is None:
+        path = []
 
-        if src not in graph or dst not in graph:
-            return []
+    if src not in graph or dst not in graph:
+        return []
 
-        path = path + [src]
-        if src == dst:
-            return [path]
+    path = path + [src]
+    if src == dst:
+        return [path]
 
-        paths = []
-        for node in graph.get(src, []):
-            if node not in path:
-                new_paths = self.DFS(graph, node, dst, path)
-                for new_path in new_paths:
-                    paths.append(new_path)
+    paths = []
+    for node in graph.get(src, []):
+        if node not in path:
+            new_paths = self.DFS(graph, node, dst, path)
+            for new_path in new_paths:
+                paths.append(new_path)
 
-        return paths
+    return paths
+
+    def get_datapath(self, dpid):
+        # 获取交换机的 datapath
+        for dp in get_switch(self, None):
+            if dp.dp.id == dpid:
+                return dp.dp
+        return None
+
+    def get_port(self, src_dpid, dst_dpid):
+        # 获取从 src_dpid 到 dst_dpid 的端口号
+        links = get_link(self, None)
+        for link in links:
+            if link.src.dpid == src_dpid and link.dst.dpid == dst_dpid:
+                return link.src.port_no
+            if link.dst.dpid == src_dpid and link.src.dpid == dst_dpid:
+                return link.dst.port_no
+        return None
