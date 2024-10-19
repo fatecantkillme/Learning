@@ -69,29 +69,29 @@ class SimpleSwitch13(app_manager.RyuApp):
 
         if eth.ethertype == ether_types.ETH_TYPE_IP:  # 只处理 IPv4 数据包
             ipv4_pkt = pkt.get_protocol(ipv4.ipv4)
-        if ipv4_pkt:
-            src_ip = ipv4_pkt.src
-            dst_ip = ipv4_pkt.dst
+            if ipv4_pkt:
+                src_ip = ipv4_pkt.src
+                dst_ip = ipv4_pkt.dst
 
-            src_dpid = self.hosts.get(src_ip)
-            dst_dpid = self.hosts.get(dst_ip)
+                src_dpid = self.hosts.get(src_ip)
+                dst_dpid = self.hosts.get(dst_ip)
 
-            if src_dpid and dst_dpid:
-                # 使用DFS查找路径
-                paths = self.DFS(self.topology, src_dpid, dst_dpid)
-                if paths:
-                    # 打印所有路径
-                    self.logger.info("All Paths: %s", paths)
+                if src_dpid and dst_dpid:
+                    # 使用DFS查找路径
+                    paths = self.DFS(self.topology, src_dpid, dst_dpid)
+                    if paths:
+                        # 打印所有路径
+                        self.logger.info("All Paths: %s", paths)
 
-                    # 找到最短路径和最长路径
-                    shortest_path = min(paths, key=len)
-                    longest_path = max(paths, key=len)
-                    self.logger.info("Shortest Path: %s", shortest_path)
-                    self.logger.info("Longest Path: %s", longest_path)
+                        # 找到最短路径和最长路径
+                        shortest_path = min(paths, key=len)
+                        longest_path = max(paths, key=len)
+                        self.logger.info("Shortest Path: %s", shortest_path)
+                        self.logger.info("Longest Path: %s", longest_path)
 
-                    # 使用最长路径下发流表规则
-                    self.install_path(longest_path, src_ip, dst_ip)
-                    return  # 下发后可以直接返回，避免重复处理
+                        # 使用最长路径下发流表规则
+                        self.install_path(longest_path, src_ip, dst_ip)
+                        return  # 下发后可以直接返回，避免重复处理
         else:
             self.logger.info("Non-IPv4 packet, ethertype: %s", eth.ethertype)
             return  # 不处理非 IPv4 数据包
