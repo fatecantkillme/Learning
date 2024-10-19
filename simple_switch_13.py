@@ -67,8 +67,8 @@ class SimpleSwitch13(app_manager.RyuApp):
         dst = eth.dst
         dpid = datapath.id
 
-        # 获取源IP和目的IP
-        ipv4_pkt = pkt.get_protocol(ipv4.ipv4)
+        if eth.ethertype == ether_types.ETH_TYPE_IP:  # 只处理 IPv4 数据包
+            ipv4_pkt = pkt.get_protocol(ipv4.ipv4)
         if ipv4_pkt:
             src_ip = ipv4_pkt.src
             dst_ip = ipv4_pkt.dst
@@ -92,8 +92,10 @@ class SimpleSwitch13(app_manager.RyuApp):
                     # 使用最长路径下发流表规则
                     self.install_path(longest_path, src_ip, dst_ip)
                     return  # 下发后可以直接返回，避免重复处理
-        if not ipv4_pkt:
-            print("No IPv4 packet found")
+        else:
+            self.logger.info("Non-IPv4 packet, ethertype: %s", eth.ethertype)
+            return  # 不处理非 IPv4 数据包
+
 
         # 如果没有找到路径或者没有IP地址关联时，使用默认的FLOOD处理
         self.mac_to_port.setdefault(dpid, {})
