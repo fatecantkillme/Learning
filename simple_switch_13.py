@@ -125,7 +125,6 @@ class SimpleSwitch13(app_manager.RyuApp):
         links = get_link(self, None)
 
         self.logger.info("Switches: %s", switch_list)
-        self.logger.info("Links: %s", all_link_stats)
 
         if not links:
             self.logger.warning("No links found. Is the topology setup correctly?")
