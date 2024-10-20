@@ -259,8 +259,9 @@ class DFSController(app_manager.RyuApp):
         处理交换机进入消息，依赖 LLDP，用于发现拓扑
         """
         self.logger.info("SwitchEnterEvent received, start topology discovery...")
-
-        self.mosttimes-=1
+        
+        if self.mosttimes!=0:
+            self.mosttimes-=1
 
         if self.mosttimes==0:
             return
