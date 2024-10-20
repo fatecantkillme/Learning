@@ -68,7 +68,7 @@ class NetworkTopology(nx.DiGraph):
         node_colors = ["red" if n in path else "black" for n in self.nodes()]
 
         plt.clf()
-        plt.title(f"Longest Path from {path[0]} to {path[-1]}")
+        plt.title("Longest Path from {} to {}".format(path[0], path[-1]))
         nx.draw(self, pos=self.pos, edge_color=edge_colors, edgecolors=node_colors, **self.plot_config)
         plt.show()
         plt.pause(1)
@@ -121,10 +121,10 @@ class PathController(app_manager.RyuApp):
             match = parser.OFPMatch(in_port=in_port, eth_src=src_mac, eth_dst=dst_mac)
             actions = [parser.OFPActionOutput(out_port)]
             self.install_flow(dp, 1, match, actions)
-            path_str += f"--{in_port}-{switch}-{out_port}"
+            path_str += "--{}-{}-{}".format(in_port, switch, out_port)
 
-        path_str += f"--{dst_mac}"
-        self.logger.info(f"Configured path: {path_str}")
+        path_str += "--" + dst_mac
+        self.logger.info("Path: {} has been configured.".format(path_str))
 
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def packet_in_handler(self, event):
