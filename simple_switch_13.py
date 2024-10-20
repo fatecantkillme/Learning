@@ -168,7 +168,6 @@ class DFSController(app_manager.RyuApp):
         for switch, in_port, out_port in path:
             datapath = self.find_datapath_by_id(int(switch))
             if not datapath:
-                self.logger.error(f"Datapath {switch} not found.")
                 continue  # 如果找不到交换机，则跳过
 
             parser = datapath.ofproto_parser
