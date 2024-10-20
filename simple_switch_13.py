@@ -1,6 +1,3 @@
-import copy
-import warnings
-
 import matplotlib.pyplot as plt
 import networkx as nx
 from ryu.base import app_manager
@@ -12,7 +9,6 @@ from ryu.ofproto import ofproto_v1_3
 from ryu.topology import event
 from ryu.topology.api import get_link, get_switch
 
-
 class Topo(nx.DiGraph):
     """
     网络拓扑，继承自 networkx.DiGraph
@@ -20,7 +16,6 @@ class Topo(nx.DiGraph):
 
     def __init__(self):
         super().__init__()
-        warnings.filterwarnings("ignore", category=UserWarning)
         self.plot_options = {
             "font_size": 20,
             "node_size": 1500,
@@ -52,45 +47,39 @@ class Topo(nx.DiGraph):
         """
         获取所有路径并根据需求返回最长路或最短路
         """
-        print("Calculating all the path of {}:{} -> {}:{}...".format(
-            src, first_port, dst, last_port))
+        print("Calculating all the path of {}:{} -> {}:{}...".format(src, first_port, dst, last_port))
 
-        vis = {}  # 标记路径上已经经过的交换机 type: dict[int, bool]
-        for s in list(self.nodes):
-            vis[s] = False  # 除 src 外，初始化为 False，即都未经过
+        vis = {s: False for s in self.nodes}
         vis[src] = True
-
-        cur_path = []
-        cur_path.append(src)
+        cur_path = [src]
         all_paths = []
 
         self.dfs(src, dst, vis, cur_path, all_paths)
         print("Found {} paths:".format(len(all_paths)))
 
+        if not all_paths:
+            print("No path found from {} to {}".format(src, dst))
+            return []  # 如果没有找到路径，返回空列表
+
         shortest_path = all_paths[0]
         longest_path = all_paths[0]
         for path in all_paths:
-            if(len(path) > len(longest_path)):
+            if len(path) > len(longest_path):
                 longest_path = path
-            if(len(path) < len(shortest_path)):
+            if len(path) < len(shortest_path):
                 shortest_path = path
             print(path)
 
-        print("Shortest path:", shortest_path,
-              "length:", len(shortest_path), sep=' ')
-        print("Longest path: ", longest_path,
-              "length:", len(longest_path), sep=' ')
+        print("Shortest path:", shortest_path, "length:", len(shortest_path), sep=' ')
+        print("Longest path: ", longest_path, "length:", len(longest_path), sep=' ')
 
         # 选择最长路
-        if src == dst:
-            path = [src]
-        else:
-            path = longest_path
+        path = [src] if src == dst else longest_path
 
         # 绘图
         self.draw_path(path)
 
-        # 生成路径：(src, in_port, out_port)->(s2, in_port, out_port)->...->(dst, in_port, out_port)
+        # 生成路径：(src, in_port, out_port) -> (s2, in_port, out_port) -> ... -> (dst, in_port, out_port)
         ryu_path = []
         in_port = first_port
         for s1, s2 in zip(path[:-1], path[1:]):
@@ -109,9 +98,9 @@ class Topo(nx.DiGraph):
             edge_to_display.append((s2, s1))
 
         edge_colors = [
-            "red" if e in edge_to_display else 'black' for e in list(self.edges)]
+            "red" if e in edge_to_display else 'black' for e in self.edges]
         node_edge_colors = [
-            "red" if n in path else "black" for n in list(self.nodes())]
+            "red" if n in path else "black" for n in self.nodes()]
 
         plt.clf()
         plt.title("Longest Path from {} to {}".format(path[0], path[-1]))
@@ -177,7 +166,10 @@ class DFSController(app_manager.RyuApp):
         # 枚举路径上涉及的交换机和端口并打印
         for switch, in_port, out_port in path:
             datapath = self.find_datapath_by_id(int(switch))
-            assert datapath
+            if not datapath:
+                self.logger.error(f"Datapath {switch} not found.")
+                continue  # 如果找不到交换机，则跳过
+
             parser = datapath.ofproto_parser
             match = parser.OFPMatch(
                 in_port=in_port, eth_src=src_mac, eth_dst=dst_mac)
@@ -218,11 +210,8 @@ class DFSController(app_manager.RyuApp):
         dst_mac = eth.dst
         src_mac = eth.src
 
-        # self.logger.info(
-        #         "From {}:{} {} packet in ({} -> {})".format(dpid, in_port, eth.ethertype, src_mac, dst_mac))
-
-        # host_mac_to 记录与主机(src_mac)直接相连的交换机的 ID 与端口
-        if src_mac not in self.host_mac_to.keys():
+        # 记录与主机(src_mac)直接相连的交换机的 ID 与端口
+        if src_mac not in self.host_mac_to:
             self.host_mac_to[src_mac] = (dpid, in_port)
 
         # 处理 ARP 数据包
@@ -230,57 +219,40 @@ class DFSController(app_manager.RyuApp):
             arp_pkt = pkt.get_protocol(arp.arp)
             assert isinstance(arp_pkt, arp.arp)
             if arp_pkt.opcode == arp.ARP_REQUEST:
-                # 这里处理的是 ARP 请求消息，因为 ARP 回复时 src 和 dst 必定已经加入拓扑
-                if (datapath.id, arp_pkt.src_mac, arp_pkt.dst_ip) in self.arp_history and self.arp_history[(datapath.id, arp_pkt.src_mac, arp_pkt.dst_ip)] != in_port:
-                    # 打破 ARP 循环，避免引发 ARP 风暴
+                # 检查 ARP 循环
+                arp_key = (datapath.id, arp_pkt.src_mac, arp_pkt.dst_ip)
+                if arp_key in self.arp_history and self.arp_history[arp_key] != in_port:
                     return
                 else:
-                    # 记录 ARP request 历史信息
-                    self.arp_history[(
-                        datapath.id, arp_pkt.src_mac, arp_pkt.dst_ip)] = in_port
+                    self.arp_history[arp_key] = in_port
 
         # 检测 host_mac_to，判断目的主机的 MAC 是否已经进入拓扑
-        if dst_mac in self.host_mac_to.keys():
-
-            # 找到和源主机直接相连的交换机
-            src_switch = self.host_mac_to[src_mac][0]
-
-            # 找到和源主机直接相连的端口
-            first_port = self.host_mac_to[src_mac][1]
-
-            # 找到和目的主机直接相连的交换机
-            dst_switch = self.host_mac_to[dst_mac][0]
-
-            # 找到与目的主机直接相连的交换机的端口
-            final_port = self.host_mac_to[dst_mac][1]
+        if dst_mac in self.host_mac_to:
+            # 找到与源主机直接相连的交换机
+            src_switch, first_port = self.host_mac_to[src_mac]
+            # 找到与目的主机直接相连的交换机
+            dst_switch, final_port = self.host_mac_to[dst_mac]
 
             # 计算路径
-            path = self.topo.search_path(
-                src_switch, dst_switch, first_port, final_port)
-            assert len(path) > 0
+            path = self.topo.search_path(src_switch, dst_switch, first_port, final_port)
+            if not path:
+                out_port = ofproto.OFPP_FLOOD  # 没有找到路径，进行泛洪
+            else:
+                # 配置路径上的交换机
+                self.configure_path(path, src_mac, dst_mac)
 
-            # 配置路径上的交换机
-            self.configure_path(path, src_mac, dst_mac)
-
-            out_port = None
-            # 设置 Packet-Out 为路径上当前交换机应该转发到的端口，避免丢包
-            for switch, _, op in path:
-                if switch == dpid:
-                    out_port = op
-            assert out_port
-            # self.logger.info(
-            #     "From {}:{}, a {} packet in ({} -> {}), send to {}".format(dpid, in_port, eth.ethertype, src_mac, dst_mac, out_port))
+                # 设置 Packet-Out 为路径上当前交换机应该转发到的端口
+                out_port = next((op for switch, _, op in path if switch == dpid), None)
+                assert out_port is not None
 
         else:
             # 目的 MAC 地址尚未收入拓扑或本身就是广播，设置为泛洪
             out_port = ofproto.OFPP_FLOOD
-            # self.logger.info(
-            #     "Unknown/Broadcast MAC address {}, flooding...".format(dst_mac))
 
         # 发送 Packet-Out，避免丢包
         actions = [parser.OFPActionOutput(out_port)]
         out = parser.OFPPacketOut(datapath=datapath, buffer_id=msg.buffer_id,
-                                  in_port=in_port, actions=actions, data=msg.data)
+                                   in_port=in_port, actions=actions, data=msg.data)
         datapath.send_msg(out)
 
     # 拓扑发现
@@ -289,22 +261,21 @@ class DFSController(app_manager.RyuApp):
         """
         处理交换机进入消息，依赖 LLDP，用于发现拓扑
         """
-        self.logger.info(
-            "SwitchEnterEvent received, start topology discovery...")
+        self.logger.info("SwitchEnterEvent received, start topology discovery...")
 
         # 重新发现拓扑时清除历史数据
         self.topo.clear()
         plt.clf()
 
         # 保存交换机信息
-        all_switches = copy.copy(get_switch(self))
+        all_switches = get_switch(self)
         self.topo.add_nodes_from([s.dp.id for s in all_switches])
         self.datapaths = [s.dp for s in all_switches]
         self.logger.info("Total {} switches:".format(len(self.topo.nodes)))
         self.logger.info(self.topo.nodes)
 
         # 保存链路信息，加入双向边（两条单向边），port 为 src 的发送端口
-        all_links = copy.copy(get_link(self))
+        all_links = get_link(self)
         self.topo.add_edges_from(
             [(l.src.dpid, l.dst.dpid, {"port": l.src.port_no}) for l in all_links])
         self.topo.add_edges_from(
@@ -315,8 +286,7 @@ class DFSController(app_manager.RyuApp):
 
         plt.title('Discovered Topology')
         self.topo.pos = nx.spring_layout(self.topo)
-        nx.draw(self.topo, pos=self.topo.pos,
-                edgecolors="black", **self.topo.plot_options)
+        nx.draw(self.topo, pos=self.topo.pos, edgecolors="black", **self.topo.plot_options)
         plt.show()
         plt.savefig("Topo.png")
         plt.pause(1)
