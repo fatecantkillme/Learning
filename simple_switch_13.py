@@ -143,14 +143,6 @@ class SimpleSwitch13(app_manager.RyuApp):
 
         self.logger.info("Topology: %s", self.topology)
 
-        hosts = get_all_host(self)
-        if not hosts:
-            self.logger.warning("No hosts found. Is host discovery enabled?")
-        else:
-            for host in hosts:
-                if host.ipv4:
-                    self.hosts[host.ipv4[0]] = host.port.dpid
-                    self.logger.info("Host: %s, DPID: %s", host.ipv4[0], host.port.dpid)
 
     def DFS(self, graph, src, dst, path=None):
         if path is None:
