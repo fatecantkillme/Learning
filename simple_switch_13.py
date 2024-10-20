@@ -136,9 +136,9 @@ class SimpleSwitch13(app_manager.RyuApp):
             dst = link.dst.dpid
             src_port=link.src.port_no
             dst_port=link.dst.port_no
-            if dst not in self.topology.get(src, []):
+            if [dst,src_port] not in self.topology.get(src, []):
                 self.topology.setdefault(src, []).append([dst,src_port])
-            if src not in self.topology.get(dst, []):
+            if [src,dst_port] not in self.topology.get(dst, []):
                 self.topology.setdefault(dst, []).append([src,dst_port])
 
         self.logger.info("Topology: %s", self.topology)
@@ -156,7 +156,7 @@ class SimpleSwitch13(app_manager.RyuApp):
             return [path]
 
         paths = []
-        for node in graph.get(src, []):
+        for node in graph.get(src, [0]):
             if node not in path:
                 new_paths = self.DFS(graph, node, dst, path)
                 for new_path in new_paths:
