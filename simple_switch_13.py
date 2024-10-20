@@ -119,6 +119,7 @@ class DFSController(app_manager.RyuApp):
         self.host_mac_to = {}  # 记录与主机直接相连的交换机 ID 与端口
         self.topo = Topo()  # 控制器发现的拓扑
         self.arp_history = {}  # ARP 历史记录
+        self.mosttimes=4
 
     def find_datapath_by_id(self, dpid: int):
         for datapath in self.datapaths:
@@ -214,18 +215,6 @@ class DFSController(app_manager.RyuApp):
         if src_mac not in self.host_mac_to:
             self.host_mac_to[src_mac] = (dpid, in_port)
 
-        # 处理 ARP 数据包
-        if eth.ethertype == ether_types.ETH_TYPE_ARP:
-            arp_pkt = pkt.get_protocol(arp.arp)
-            assert isinstance(arp_pkt, arp.arp)
-            if arp_pkt.opcode == arp.ARP_REQUEST:
-                # 检查 ARP 循环
-                arp_key = (datapath.id, arp_pkt.src_mac, arp_pkt.dst_ip)
-                if arp_key in self.arp_history and self.arp_history[arp_key] != in_port:
-                    return
-                else:
-                    self.arp_history[arp_key] = in_port
-
         # 检测 host_mac_to，判断目的主机的 MAC 是否已经进入拓扑
         if dst_mac in self.host_mac_to:
             # 找到与源主机直接相连的交换机
@@ -251,9 +240,17 @@ class DFSController(app_manager.RyuApp):
 
         # 发送 Packet-Out，避免丢包
         actions = [parser.OFPActionOutput(out_port)]
-        out = parser.OFPPacketOut(datapath=datapath, buffer_id=msg.buffer_id,
-                                   in_port=in_port, actions=actions, data=msg.data)
+
+        # 如果 `buffer_id` 有效，直接使用，否则传输整个数据包
+        if msg.buffer_id != ofproto.OFP_NO_BUFFER:
+            out = parser.OFPPacketOut(datapath=datapath, buffer_id=msg.buffer_id,
+                                    in_port=in_port, actions=actions, data=None)
+        else:
+            out = parser.OFPPacketOut(datapath=datapath, buffer_id=ofproto.OFP_NO_BUFFER,
+                                    in_port=in_port, actions=actions, data=msg.data)
+
         datapath.send_msg(out)
+
 
     # 拓扑发现
     @set_ev_cls(event.EventSwitchEnter)
@@ -262,6 +259,11 @@ class DFSController(app_manager.RyuApp):
         处理交换机进入消息，依赖 LLDP，用于发现拓扑
         """
         self.logger.info("SwitchEnterEvent received, start topology discovery...")
+
+        self.mosttimes-=1
+
+        if self.mosttimes==0:
+            return
 
         # 重新发现拓扑时清除历史数据
         self.topo.clear()
