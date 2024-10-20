@@ -52,7 +52,7 @@ def myNetwork():
     h9 = net.addHost('h9', cls=Host, ip='10.0.0.9', defaultRoute=None,mac='00:00:00:00:00:09')
     h1 = net.addHost('h1', cls=Host, ip='10.0.0.1', defaultRoute=None,mac='00:00:00:00:00:01')
 
-    # 添加新的主机 h13，并连接到 s1 交换机
+
     h13 = net.addHost('h13', cls=Host, ip='10.0.0.13', defaultRoute=None, mac='00:00:00:00:00:0d')
 
     info( '*** Add links\n')
@@ -86,7 +86,6 @@ def myNetwork():
     net.addLink(h11, s11)
     net.addLink(h9, s9)
 
-    # 连接 h13 和 s1
     net.addLink(h13, s1)
 
     info( '*** Starting network\n')
