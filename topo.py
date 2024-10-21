@@ -25,7 +25,7 @@ class MyTopo(object):
 def run():
         setLogLevel('info')
         topo= MyTopo()
-        net=Mininet(topo=topo, link=TCink, controller=RemoteController('c0', ip='127.0.0.1', port=6633))
+        net=Mininet(topo=topo, link=TCink)
         net.start()
         
         CLI(net)
