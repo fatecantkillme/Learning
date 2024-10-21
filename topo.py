@@ -5,7 +5,7 @@ from mininet.log import setLogLevel
 from mininet.link import TCLink
 
 
-class MyTopo(object):
+class MyTopo(Topo):
 
     def __init__(self):
         Topo.__init__(self)
