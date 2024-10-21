@@ -21,6 +21,7 @@ class MyTopo(Topo):
         self.addLink(Host2, Switch2)
         self.addLink(Host3, Switch2)
         self.addLink(Host4, Switch2)
+        self.addLink(Switch1,Switch2)
     
 def run():
         setLogLevel('info')
