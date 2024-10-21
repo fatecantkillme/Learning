@@ -2,10 +2,10 @@ from mininet.topo import Topo
 from mininet.net import Mininet
 from mininet.cli import CLI
 from mininet.log import setLogLevel
-from mininet.link import TCLink  # Import TCLink to enable bw and delay parameters
+from mininet.link import TCLink
 
 
-class MyTopo(Topo):
+class MyTopo(object):
 
     def __init__(self):
         Topo.__init__(self)
@@ -25,7 +25,7 @@ class MyTopo(Topo):
 def run():
         setLogLevel('info')
         topo= MyTopo()
-        net=Mininet(topo=topo, link=TCink)
+        net=Mininet(topo=topo, link=TCLink)
         net.start()
         
         CLI(net)
